@@ -6,6 +6,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     target: 'es2020',
+    // 打包成单个 JS，方便 Capacitor 加载
     cssCodeSplit: false,
     rollupOptions: {
       output: {

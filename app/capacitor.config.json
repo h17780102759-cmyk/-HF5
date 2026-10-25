@@ -1,6 +1,6 @@
 {
-  "appId": "com.test.xiezuoqi2",
-  "appName": "写作器2",
+  "appId": "com.test.xianfu",
+  "appName": "闲赋",
   "webDir": "www",
   "bundledWebRuntime": false,
   "server": {

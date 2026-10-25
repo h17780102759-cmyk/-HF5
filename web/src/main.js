@@ -1,7 +1,6 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, drawSelection } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-
 /* ============================================================
    最简 CodeMirror 配置 —— 验证安卓输入法组字
    去掉：行号、Markdown、主题包、高亮、自动补全
@@ -89,12 +88,39 @@ const view = new EditorView({
   parent: appEl
 });
 
-/* ===== 事件探测（只读，不影响输入） ===== */
+/* ===== 事件探测 + 组字兜底 ===== */
 const dom = view.contentDOM;
 
-dom.addEventListener("compositionstart", () => pushEvt("组字开始"));
-dom.addEventListener("compositionupdate", (e) => pushEvt("组字中", e.data || ""));
-dom.addEventListener("compositionend", (e) => pushEvt("组字结束", e.data || ""));
+let lastCompositionData = "";
+let docLenBeforeComposition = 0;
+
+dom.addEventListener("compositionstart", () => {
+  pushEvt("组字开始");
+  lastCompositionData = "";
+  docLenBeforeComposition = view.state.doc.length;
+});
+
+dom.addEventListener("compositionupdate", (e) => {
+  pushEvt("组字中", e.data || "");
+  lastCompositionData = e.data || "";
+});
+
+dom.addEventListener("compositionend", (e) => {
+  const data = e.data || lastCompositionData || "";
+  pushEvt("组字结束", data);
+
+  // 兜底：如果组字有内容但文档没变，手动插入
+  setTimeout(() => {
+    const nowLen = view.state.doc.length;
+    if (data && nowLen === docLenBeforeComposition) {
+      view.dispatch(
+        view.state.replaceSelection(data)
+      );
+      pushEvt("手动插入", data);
+    }
+  }, 30);
+});
+
 dom.addEventListener("beforeinput", (e) => pushEvt("beforeinput", e.inputType || ""));
 dom.addEventListener("input", () => pushEvt("input"));
 dom.addEventListener("keydown", (e) => {

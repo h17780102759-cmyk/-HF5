@@ -459,6 +459,11 @@ function openFormat() {
 /* ============================================================
    灵感面板
    ============================================================ */
+/* ============================================================
+   后文灵感：翻页式浏览 + 句子管理
+   ============================================================ */
+
+/* ---------- 句子池工具 ---------- */
 function getPool(genre) {
   const builtin = (SENTENCE_LIB[genre] || SENTENCE_LIB["通用"] || []).slice();
   const hidden = S.hiddenSent[genre] || [];
@@ -467,96 +472,347 @@ function getPool(genre) {
   return visible.concat(mine);
 }
 
-function openIdea() {
+// 内置句（含原始索引）
+function getBuiltinVisible(genre) {
+  const all = SENTENCE_LIB[genre] || SENTENCE_LIB["通用"] || [];
+  const hid = S.hiddenSent[genre] || [];
+  const out = [];
+  all.forEach((text, i) => {
+    if (hid.indexOf(i) === -1) out.push({ text, idx: i });
+  });
+  return out;
+}
+
+function saveHidden() {
+  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(S.hiddenSent)); } catch (e) {}
+}
+
+function saveUserSent() {
+  try { localStorage.setItem(USER_SENT_KEY, JSON.stringify(S.userSent)); } catch (e) {}
+}
+
+/* ---------- 灵感面板（翻页式） ---------- */
+let ideaState = null;   // { genre, idx }
+
+function openIdea(opts) {
   S.mode = "idea";
+
+  if (!ideaState || (opts && opts.reset)) {
+    ideaState = { genre: S.genre, idx: 0 };
+  }
+  ideaState.genre = S.genre;
+
+  renderIdeaPage();
+}
+
+function renderIdeaPage() {
   const pool = getPool(S.genre);
-  let cur = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "";
+  if (ideaState.idx >= pool.length) ideaState.idx = 0;
+  if (ideaState.idx < 0) ideaState.idx = Math.max(0, pool.length - 1);
 
-  function render() {
-    let html = '<div class="p-title">后文灵感</div>';
-    html += '<div class="p-sub">题材</div><div class="row">';
-    GENRE_LIST.forEach((g) => {
-      html += `<div class="chip${g.name === S.genre ? " active" : ""}" data-genre="${esc(g.id)}">${esc(g.name)}</div>`;
+  const cur = pool.length ? pool[ideaState.idx] : "";
+
+  let html = '<div class="p-title">后文灵感</div>';
+
+  // 题材选择
+  html += '<div class="p-sub">题材</div><div class="row">';
+  GENRE_LIST.forEach((g) => {
+    html += `<div class="chip${g.name === S.genre ? " active" : ""}" data-genre="${esc(g.id)}">${esc(g.name)}</div>`;
+  });
+  html += "</div>";
+
+  // 翻页卡片
+  html += `<div class="book-wrap">
+    <div class="book-stage" id="bookStage">
+      <div class="book-page" id="bookPage">
+        <div class="sent-text" id="sentText">${esc(cur) || "此题材暂无句子"}</div>
+      </div>
+    </div>
+    <div class="page-indicator" id="pageInd">${pool.length ? (ideaState.idx + 1) + " / " + pool.length : "0 / 0"}</div>
+  </div>`;
+
+  // 翻页与操作按钮
+  html += `<div class="pager">
+    <button id="btnPrev" class="pager-btn">◀</button>
+    <button id="btnCopySent" class="primary">复制</button>
+    <button id="btnNext" class="pager-btn">▶</button>
+  </div>`;
+
+  // 添加句子
+  html += '<div class="p-sub">添加句子</div>';
+  html += '<textarea id="newSent" class="sent-input" placeholder="输入一句…"></textarea>';
+  html += `<div class="row">
+    <button class="primary" id="btnAddSent">保存</button>
+    <span class="hint">Ctrl+Enter 快速保存</span>
+    <span style="flex:1"></span>
+    <button id="btnManageSent">管理句子</button>
+  </div>`;
+
+  showPanel(html);
+  bindIdeaEvents();
+}
+
+/* ---------- 翻页 ---------- */
+function turnIdeaPage(dir) {
+  const pool = getPool(S.genre);
+  if (pool.length <= 1) return;
+
+  const page = $("bookPage");
+  const stage = $("bookStage");
+  if (!page || !stage) return;
+  if (stage.dataset.turning === "1") return;
+  stage.dataset.turning = "1";
+
+  let next = ideaState.idx + dir;
+  if (next >= pool.length) next = 0;              // 循环
+  if (next < 0) next = pool.length - 1;
+
+  // 翻出
+  page.classList.add(dir > 0 ? "turn-out-left" : "turn-out-right");
+
+  setTimeout(() => {
+    ideaState.idx = next;
+    page.classList.remove("turn-out-left", "turn-out-right");
+    page.classList.add(dir > 0 ? "turn-in-right" : "turn-in-left");
+
+    const el = $("sentText");
+    if (el) el.textContent = pool[next];
+
+    const ind = $("pageInd");
+    if (ind) ind.textContent = (next + 1) + " / " + pool.length;
+
+    setTimeout(() => {
+      page.classList.remove("turn-in-right", "turn-in-left");
+      stage.dataset.turning = "0";
+    }, 260);
+  }, 200);
+}
+
+/* ---------- 复制 ---------- */
+function copyCurrentSentence() {
+  const pool = getPool(S.genre);
+  const t = pool[ideaState.idx];
+  if (!t) return;
+  copyText(t).then((ok) => {
+    if (ok) {
+      setStatus("已复制", "ok");
+      const page = $("bookPage");
+      if (page) {
+        page.classList.add("flash");
+        setTimeout(() => page.classList.remove("flash"), 300);
+      }
+    }
+  });
+}
+
+/* ---------- 灵感面板事件 ---------- */
+function bindIdeaEvents() {
+  // 题材切换：重置到第一条
+  document.querySelectorAll("[data-genre]").forEach((el) => {
+    el.addEventListener("click", () => {
+      S.genre = GENRE_NAME[el.dataset.genre] || "通用";
+      try { localStorage.setItem(GENRE_KEY, el.dataset.genre); } catch (e) {}
+      ideaState.idx = 0;
+      renderIdeaPage();
     });
-    html += "</div>";
+  });
 
-    html += `<div class="sent-card" id="sentCard"><div class="sent-text" id="sentText">${esc(cur) || "此题材暂无句子"}</div></div>`;
-    html += '<div class="row" style="justify-content:center"><button class="primary" id="btnRefresh">刷新</button><button id="btnCopySent">复制</button></div>';
+  const prev = $("btnPrev");
+  const next = $("btnNext");
+  if (prev) prev.addEventListener("click", () => turnIdeaPage(-1));
+  if (next) next.addEventListener("click", () => turnIdeaPage(1));
 
-    html += '<div class="p-sub">添加句子</div>';
-    html += '<textarea id="newSent" class="sent-input" placeholder="输入一句…"></textarea>';
-    html += '<div class="row"><button class="primary" id="btnAddSent">保存</button><span class="hint">Ctrl+Enter 快速保存</span></div>';
+  const cb = $("btnCopySent");
+  if (cb) cb.addEventListener("click", copyCurrentSentence);
 
-    showPanel(html);
-
-    document.querySelectorAll("[data-genre]").forEach((el) => {
-      el.addEventListener("click", () => {
-        S.genre = GENRE_NAME[el.dataset.genre] || "通用";
-        try { localStorage.setItem(GENRE_KEY, el.dataset.genre); } catch (e) {}
-        const p = getPool(S.genre);
-        cur = p.length ? p[Math.floor(Math.random() * p.length)] : "";
-        render();
-      });
+  const page = $("bookPage");
+  if (page) {
+    page.addEventListener("click", () => {
+      if (page.dataset.swiped === "1") { page.dataset.swiped = "0"; return; }
+      copyCurrentSentence();
     });
-
-    const rf = $("btnRefresh");
-    if (rf) {
-      rf.addEventListener("click", () => {
-        const p = getPool(S.genre);
-        if (!p.length) return;
-        let next = cur;
-        let guard = 0;
-        while (next === cur && guard++ < 20) next = p[Math.floor(Math.random() * p.length)];
-        cur = next;
-        const el = $("sentText");
-        if (el) {
-          el.textContent = cur;
-          el.style.opacity = "0.2";
-          setTimeout(() => { el.style.opacity = "1"; }, 40);
-        }
-      });
-    }
-
-    const cb = $("btnCopySent");
-    if (cb) {
-      cb.addEventListener("click", () => {
-        if (!cur) return;
-        copyText(cur).then((ok) => { if (ok) setStatus("已复制", "ok"); });
-      });
-    }
-
-    const card = $("sentCard");
-    if (card) {
-      card.addEventListener("click", () => {
-        if (!cur) return;
-        copyText(cur).then((ok) => { if (ok) setStatus("已复制", "ok"); });
-      });
-    }
-
-    const ab = $("btnAddSent");
-    const inp = $("newSent");
-    if (ab && inp) {
-      const doAdd = () => {
-        const t = inp.value.trim();
-        if (!t) return;
-        if (!S.userSent[S.genre]) S.userSent[S.genre] = [];
-        if (S.userSent[S.genre].indexOf(t) !== -1) { setStatus("已存在", "warn"); return; }
-        S.userSent[S.genre].push(t);
-        try { localStorage.setItem(USER_SENT_KEY, JSON.stringify(S.userSent)); } catch (e) {}
-        inp.value = "";
-        cur = t;
-        const el = $("sentText");
-        if (el) el.textContent = t;
-        setStatus("已添加", "ok");
-      };
-      ab.addEventListener("click", doAdd);
-      inp.addEventListener("keydown", (e) => {
-        if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); doAdd(); }
-      });
-    }
   }
 
-  render();
+  // 触摸滑动
+  const stage = $("bookStage");
+  if (stage) {
+    let startX = 0, startY = 0;
+
+    stage.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+    }, { passive: true });
+
+    stage.addEventListener("touchend", (e) => {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        if (page) page.dataset.swiped = "1";
+        turnIdeaPage(dx < 0 ? 1 : -1);
+      }
+    }, { passive: true });
+
+    // 鼠标拖拽
+    let mouseX = 0, down = false;
+    stage.addEventListener("mousedown", (e) => { down = true; mouseX = e.clientX; });
+    stage.addEventListener("mouseup", (e) => {
+      if (!down) return;
+      down = false;
+      const dx = e.clientX - mouseX;
+      if (Math.abs(dx) > 60) {
+        if (page) page.dataset.swiped = "1";
+        turnIdeaPage(dx < 0 ? 1 : -1);
+      }
+    });
+    stage.addEventListener("mouseleave", () => { down = false; });
+  }
+
+  // 键盘方向键
+  document.addEventListener("keydown", function ideaKey(e) {
+    if (S.mode !== "idea") {
+      document.removeEventListener("keydown", ideaKey);
+      return;
+    }
+    if (!$("panelMask").classList.contains("show")) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); turnIdeaPage(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); turnIdeaPage(1); }
+  });
+
+  // 添加句子
+  const ab = $("btnAddSent");
+  const inp = $("newSent");
+  if (ab && inp) {
+    const doAdd = () => {
+      const t = inp.value.trim();
+      if (!t) return;
+      if (!S.userSent[S.genre]) S.userSent[S.genre] = [];
+      if (S.userSent[S.genre].indexOf(t) !== -1) {
+        setStatus("已存在", "warn");
+        return;
+      }
+      S.userSent[S.genre].push(t);
+      saveUserSent();
+      inp.value = "";
+      const pool = getPool(S.genre);
+      ideaState.idx = pool.length - 1;   // 跳到新加的
+      renderIdeaPage();
+      setStatus("已添加", "ok");
+    };
+    ab.addEventListener("click", doAdd);
+    inp.addEventListener("keydown", (e) => {
+      if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); doAdd(); }
+    });
+  }
+
+  // 管理
+  const mb = $("btnManageSent");
+  if (mb) mb.addEventListener("click", openSentManager);
+}
+
+/* ============================================================
+   句子管理面板
+   ============================================================ */
+function openSentManager() {
+  S.mode = "manage";
+
+  const builtin = getBuiltinVisible(S.genre);
+  const mine = S.userSent[S.genre] || [];
+  const total = builtin.length + mine.length;
+
+  let html = `<div class="p-title">管理「${esc(S.genre)}」</div>`;
+  html += `<div class="p-sub">共 ${total} 句</div>`;
+
+  // 内置句子
+  if (builtin.length > 0) {
+    html += `<div class="g-title" style="color:var(--accent)">内置（${builtin.length} 句）</div>`;
+    builtin.forEach((b) => {
+      html += `<div class="item sent-row">
+        <span class="sent-row-text">${esc(b.text)}</span>
+        <button class="del" data-delbuiltin="${b.idx}">×</button>
+      </div>`;
+    });
+  }
+
+  // 自定义句子
+  if (mine.length > 0) {
+    html += `<div class="g-title" style="color:#d9a54a">我添加的（${mine.length} 句）</div>`;
+    mine.forEach((t, i) => {
+      html += `<div class="item sent-row" style="border-left-color:#d9a54a">
+        <span class="sent-row-text">${esc(t)}</span>
+        <button class="del" data-delmine="${i}">×</button>
+      </div>`;
+    });
+  }
+
+  if (total === 0) {
+    html += '<div class="empty">此题材没有句子</div>';
+  }
+
+  html += `<div class="p-foot">
+    <button id="btnBackIdea" class="primary">返回</button>
+    <button id="btnExportSent">导出句子</button>
+  </div>`;
+
+  showPanel(html);
+
+  // 删除内置句
+  document.querySelectorAll("[data-delbuiltin]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const idx = parseInt(el.dataset.delbuiltin, 10);
+      const txt = (SENTENCE_LIB[S.genre] || [])[idx] || "";
+      if (!confirm("删除这句？\n\n" + txt)) return;
+      if (!S.hiddenSent[S.genre]) S.hiddenSent[S.genre] = [];
+      if (S.hiddenSent[S.genre].indexOf(idx) === -1) S.hiddenSent[S.genre].push(idx);
+      saveHidden();
+      openSentManager();
+    });
+  });
+
+  // 删除自定义句
+  document.querySelectorAll("[data-delmine]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const i = parseInt(el.dataset.delmine, 10);
+      const arr = S.userSent[S.genre] || [];
+      const txt = arr[i] || "";
+      if (!confirm("删除这句？\n\n" + txt)) return;
+      arr.splice(i, 1);
+      if (arr.length === 0) delete S.userSent[S.genre];
+      saveUserSent();
+      openSentManager();
+    });
+  });
+
+  const back = $("btnBackIdea");
+  if (back) back.addEventListener("click", () => {
+    ideaState.idx = 0;
+    openIdea({ reset: true });
+  });
+
+  const exp = $("btnExportSent");
+  if (exp) exp.addEventListener("click", () => {
+    const lines = [];
+    GENRE_LIST.forEach((g) => {
+      const pool = getPool(g.name);
+      if (pool.length === 0) return;
+      lines.push(`## ${g.name}（${pool.length} 句）`);
+      pool.forEach((s) => lines.push(s));
+      lines.push("");
+    });
+    if (lines.length === 0) { setStatus("没有可导出的句子", "warn"); return; }
+    const txt = lines.join("\n");
+    const blob = new Blob(["\ufeff" + txt], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "闲赋句子库.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    setStatus("已导出句子库", "ok");
+  });
 }
 
 function copyText(text) {

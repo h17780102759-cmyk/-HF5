@@ -10,11 +10,8 @@
   },
   "dependencies": {
     "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "^6.36.2",
-    "@codemirror/commands": "^6.8.1",
-    "@codemirror/language": "^6.10.8",
-    "@codemirror/lang-markdown": "^6.3.2",
-    "@codemirror/theme-one-dark": "^6.1.2"
+    "@codemirror/view": "^6.43.6",
+    "@codemirror/commands": "^6.9.0"
   },
   "devDependencies": {
     "vite": "^6.0.7"

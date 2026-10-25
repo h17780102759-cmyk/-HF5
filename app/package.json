@@ -1,7 +1,7 @@
 {
   "name": "xiezuoqi",
-  "version": "1.0.0",
-  "description": "writing tool",
+  "version": "2.0.0",
+  "description": "xianfu writing tool",
   "private": true,
   "scripts": {
     "build": "echo no-build-step"
@@ -9,6 +9,7 @@
   "dependencies": {
     "@capacitor/android": "6.2.0",
     "@capacitor/core": "6.2.0",
+    "@capacitor/app": "6.0.2",
     "@capacitor/filesystem": "6.0.0",
     "@capacitor/share": "6.0.0"
   },

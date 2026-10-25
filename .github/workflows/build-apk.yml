@@ -152,34 +152,6 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           cat local.properties
 
-      - name: Configure Gradle mirrors
-        working-directory: app/android
-        run: |
-          echo "=== inject mirror repositories into settings.gradle ==="
-          if [ -f settings.gradle ]; then
-            cp settings.gradle settings.gradle.bak
-            python3 - <<'PYEOF'
-import re, pathlib
-p = pathlib.Path('settings.gradle')
-s = p.read_text()
-mirrors = (
-    "        maven { url 'https://maven.aliyun.com/repository/google' }\n"
-    "        maven { url 'https://maven.aliyun.com/repository/central' }\n"
-    "        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }\n"
-    "        maven { url 'https://maven.aliyun.com/repository/public' }\n"
-)
-if 'aliyun' not in s:
-    s = re.sub(r'(repositories\s*\{)', r'\1\n' + mirrors, s, count=1)
-    p.write_text(s)
-    print('mirror injected')
-else:
-    print('mirror already present')
-PYEOF
-            cat settings.gradle
-          else
-            echo "no settings.gradle, skip"
-          fi
-
       - name: Build debug APK
         working-directory: app/android
         run: |

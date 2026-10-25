@@ -1101,7 +1101,119 @@ function init() {
     }
   });
 
+  // ========== 返回键拦截（双击退出） ==========
+  setupBackButton();
+
   setStatus("就绪", "ok");
+}
+
+/* ============================================================
+   返回键：第一次提示，2 秒内再按才退出
+   ============================================================ */
+let backPressedOnce = false;
+let backTimer = null;
+
+function handleBack() {
+  // ① 如果有面板打开，先关面板
+  if ($("panelMask").classList.contains("show")) {
+    closePanel();
+    return true;   // 已处理
+  }
+  if ($("setMask").classList.contains("show")) {
+    closeSettings();
+    return true;
+  }
+  if ($("drawer").classList.contains("show")) {
+    $("drawerMask").classList.remove("show");
+    $("drawer").classList.remove("show");
+    return true;
+  }
+  if ($("menuPanel").classList.contains("show")) {
+    $("menuPanel").classList.remove("show");
+    return true;
+  }
+
+  // ② 没有面板：判断是否要退出
+  if (backPressedOnce) {
+    // 第二次按：保存并退出
+    saveCurrent();
+    backPressedOnce = false;
+    if (backTimer) { clearTimeout(backTimer); backTimer = null; }
+    exitApp();
+    return true;
+  }
+
+  // 第一次按：提示
+  backPressedOnce = true;
+  showToast("再按一次返回键退出");
+  backTimer = setTimeout(() => {
+    backPressedOnce = false;
+    backTimer = null;
+  }, 2000);
+  return true;
+}
+
+function exitApp() {
+  // Capacitor 环境下真正退出
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+    window.Capacitor.Plugins.App.exitApp();
+    return;
+  }
+  // 网页环境下：尝试关闭窗口（多数浏览器不允许）
+  try { window.close(); } catch (e) {}
+}
+
+function setupBackButton() {
+  // ---- 方式 1：Capacitor 原生返回键（如果有 App 插件） ----
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+    try {
+      // Capacitor 6 中监听通过 addListener，返回 Promise
+      Promise.resolve(
+        window.Capacitor.Plugins.App.addListener("backButton", () => {
+          if (!handleBack()) exitApp();
+        })
+      ).catch(() => {});
+    } catch (e) {}
+  }
+
+  // ---- 方式 2：history 拦截（WebView / 浏览器通用） ----
+  // 先压入一个历史记录，拦截返回
+  try {
+    history.pushState({ guard: true }, "", location.href);
+  } catch (e) {}
+
+  window.addEventListener("popstate", (e) => {
+    // 每次返回都重新压入，保证不会被真正退回
+    try {
+      history.pushState({ guard: true }, "", location.href);
+    } catch (err) {}
+
+    const handled = handleBack();
+    if (!handled) {
+      // 允许退出
+      try { history.back(); } catch (err) {}
+    }
+  });
+}
+
+/* ============================================================
+   轻提示（比 setStatus 更醒目）
+   ============================================================ */
+let toastTimer = null;
+function showToast(msg) {
+  let el = $("appToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "appToast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add("show");
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.remove("show");
+  }, 1800);
 }
 
 document.addEventListener("DOMContentLoaded", init);

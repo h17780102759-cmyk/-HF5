@@ -18,7 +18,6 @@ jobs:
           ls -la app || echo "NO app DIRECTORY"
           echo "=== app/www ==="
           ls -la app/www || echo "NO www DIRECTORY"
-
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
@@ -39,7 +38,6 @@ jobs:
               ls "$d"
             fi
           done
-
       - name: Configure Android SDK
         run: |
           SDK="/usr/local/lib/android/sdk"
@@ -53,7 +51,6 @@ jobs:
           echo "ANDROID_SDK_ROOT=$SDK" >> $GITHUB_ENV
           echo "$SDK/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$SDK/platform-tools" >> $GITHUB_PATH
-
       - name: Show tool versions
         run: |
           node -v
@@ -62,7 +59,6 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           ls "$ANDROID_HOME/platforms" 2>/dev/null || echo "no platforms dir"
           ls "$ANDROID_HOME/build-tools" 2>/dev/null || echo "no build-tools dir"
-
       - name: Build web app (Vite + CodeMirror)
         working-directory: web
         run: |
@@ -72,26 +68,22 @@ jobs:
           npm run build
           echo "=== build output ==="
           ls -la dist
-
       - name: Copy web build into Capacitor www
         run: |
           rm -rf app/www/*
           cp -r web/dist/* app/www/
           echo "=== app/www after copy ==="
           ls -la app/www
-
       - name: Install dependencies
         working-directory: app
         run: |
           cat package.json
           npm install --no-audit --no-fund
-
       - name: Show installed capacitor
         working-directory: app
         run: |
           npx cap --version || echo "cap cli not available"
           ls node_modules/@capacitor || echo "no @capacitor dir"
-
       - name: Add Android platform
         working-directory: app
         run: npx cap add android
@@ -103,89 +95,26 @@ jobs:
       - name: Set app icons
         working-directory: app
         run: |
-          echo "=== check source icons ==="
-          ls -la www/icon-*.png 2>/dev/null || echo "SOURCE ICONS MISSING in www/"
-
-          echo "=== install imagemagick ==="
           sudo apt-get update -qq
-          sudo apt-get install -y -qq imagemagick || echo "imagemagick install failed"
-
-          echo "=== imagemagick version ==="
-          convert --version 2>/dev/null | head -2 || echo "convert not available"
-
-          echo "=== find android res dirs ==="
-          find android/app/src/main/res -maxdepth 1 -type d -name "mipmap*" | sort
-
+          sudo apt-get install -y -qq imagemagick || echo "imagemagick failed, continuing"
           for pair in "mdpi:48" "hdpi:72" "xhdpi:96" "xxhdpi:144" "xxxhdpi:192"; do
             dpi="${pair%%:*}"
             size="${pair##*:}"
             DIR="android/app/src/main/res/mipmap-$dpi"
             mkdir -p "$DIR"
-            if [ -f www/icon-512.png ]; then
-              convert www/icon-512.png -resize ${size}x${size} "$DIR/ic_launcher.png" \
-                && echo "OK  $DIR/ic_launcher.png (from icon-512)"
-            elif [ -f www/icon-192.png ]; then
-              convert www/icon-192.png -resize ${size}x${size} "$DIR/ic_launcher.png" \
-                && echo "OK  $DIR/ic_launcher.png (from icon-192)"
-            else
-              echo "MISSING SOURCE, keep default for $DIR"
-            fi
-            cp "$DIR/ic_launcher.png" "$DIR/ic_launcher_round.png" 2>/dev/null || true
+            convert www/icon-512.png -resize ${size}x${size} "$DIR/ic_launcher.png" 2>/dev/null || \
+              cp www/icon-192.png "$DIR/ic_launcher.png"
           done
-
-          echo "=== verify generated icons ==="
-          find android/app/src/main/res -name "ic_launcher*.png" -exec ls -la {} \;
-
-          echo "=== remove adaptive icon XML (forces PNG usage) ==="
-          rm -rf android/app/src/main/res/mipmap-anydpi-v26
-          rm -f android/app/src/main/res/drawable/ic_launcher_background.xml
-          rm -f android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
-          echo "adaptive icon resources removed"
-
-          echo "=== final icon check ==="
-          find android/app/src/main/res -name "ic_launcher*" | sort
-          ls -la android/app/src/main/res/mipmap-xxxhdpi/
-
       - name: Write local.properties
         working-directory: app/android
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           cat local.properties
-
-      - name: Configure Gradle mirrors
-        working-directory: app/android
-        run: |
-          echo "=== inject mirror repositories into settings.gradle ==="
-          if [ -f settings.gradle ]; then
-            cp settings.gradle settings.gradle.bak
-            python3 - <<'PYEOF'
-import re, pathlib
-p = pathlib.Path('settings.gradle')
-s = p.read_text()
-mirrors = (
-    "        maven { url 'https://maven.aliyun.com/repository/google' }\n"
-    "        maven { url 'https://maven.aliyun.com/repository/central' }\n"
-    "        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }\n"
-    "        maven { url 'https://maven.aliyun.com/repository/public' }\n"
-)
-if 'aliyun' not in s:
-    s = re.sub(r'(repositories\s*\{)', r'\1\n' + mirrors, s, count=1)
-    p.write_text(s)
-    print('mirror injected')
-else:
-    print('mirror already present')
-PYEOF
-            cat settings.gradle
-          else
-            echo "no settings.gradle, skip"
-          fi
-
       - name: Build debug APK
         working-directory: app/android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

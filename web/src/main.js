@@ -27,7 +27,7 @@ const S = {
   bookId: null,
   chapterId: null,
   chapterTitle: "",
-  env: { theme: "dark", size: 17, line: 2.1, width: 760 },
+  env: { theme: "dark", size: 17, line: 2.1, width: 760, tex: "paper", texOpacity: 8 },
   genre: "通用",
   userSent: {},
   hiddenSent: {},
@@ -87,9 +87,13 @@ function createEditor(parent) {
     "&": { height: "100%", fontSize: "var(--ed-size)", backgroundColor: "transparent", color: "var(--text)" },
     ".cm-scroller": {
       fontFamily: 'var(--ed-font)', lineHeight: "var(--ed-line)",
-      padding: "32px 20px", overflowY: "auto"
+      padding: "32px 20px", overflowY: "auto",
+      backgroundColor: "transparent"
     },
-    ".cm-content": { caretColor: "var(--accent)", maxWidth: "var(--ed-width)", margin: "0 auto" },
+    ".cm-content": {
+      caretColor: "var(--accent)", maxWidth: "var(--ed-width)",
+      margin: "0 auto", backgroundColor: "transparent"
+    },
     ".cm-line": { padding: "0" },
     "&.cm-focused": { outline: "none" },
     ".cm-cursor": { borderLeftWidth: "2px", borderLeftColor: "var(--accent)" },
@@ -636,17 +640,26 @@ function applyEnv() {
   r.setProperty("--ed-width", S.env.width + "px");
   r.setProperty("--ed-font", FONT_MAP.hei);
 
-  const vs = $("valSize"), vl = $("valLine"), vw = $("valWidth");
-  const rs = $("rngSize"), rl = $("rngLine"), rw = $("rngWidth");
+  // 背景纹理
+  document.body.setAttribute("data-tex", S.env.tex || "none");
+  r.setProperty("--tex-opacity", (S.env.texOpacity / 100).toFixed(3));
+
+  const vs = $("valSize"), vl = $("valLine"), vw = $("valWidth"), vt = $("valTex");
+  const rs = $("rngSize"), rl = $("rngLine"), rw = $("rngWidth"), rt = $("rngTex");
   if (vs) vs.textContent = S.env.size + "px";
   if (vl) vl.textContent = S.env.line.toFixed(1);
   if (vw) vw.textContent = S.env.width + "px";
+  if (vt) vt.textContent = S.env.texOpacity + "%";
   if (rs) rs.value = S.env.size;
   if (rl) rl.value = Math.round(S.env.line * 10);
   if (rw) rw.value = S.env.width;
+  if (rt) rt.value = S.env.texOpacity;
 
   document.querySelectorAll("[data-theme]").forEach((el) => {
     el.classList.toggle("active", el.dataset.theme === S.env.theme);
+  });
+  document.querySelectorAll("[data-tex-opt]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.texOpt === (S.env.tex || "none"));
   });
 }
 
@@ -757,6 +770,16 @@ function init() {
   $("rngWidth").addEventListener("input", (e) => {
     S.env.width = parseInt(e.target.value, 10);
     applyEnv(); saveEnv();
+  });
+  $("rngTex").addEventListener("input", (e) => {
+    S.env.texOpacity = parseInt(e.target.value, 10);
+    applyEnv(); saveEnv();
+  });
+  document.querySelectorAll("[data-tex-opt]").forEach((el) => {
+    el.addEventListener("click", () => {
+      S.env.tex = el.dataset.texOpt;
+      applyEnv(); saveEnv();
+    });
   });
 
   // 恢复上次的书

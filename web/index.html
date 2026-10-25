@@ -16,6 +16,14 @@
     --s2:0 4px 14px rgba(0,0,0,.35);
     --s3:0 16px 48px rgba(0,0,0,.55);
   }
+  /* 暗色（默认，与 :root 一致，显式声明以便切回时完全重置） */
+  body.theme-dark{
+    --bg:#1e1f22; --panel:#26282c; --text:#d6d8dc; --dim:#8b8f96;
+    --accent:#5b8dd6; --line:#34373c; --btn:#33363b; --btn-h:#3d4147;
+    --s1:0 1px 2px rgba(0,0,0,.3);
+    --s2:0 4px 14px rgba(0,0,0,.35);
+    --s3:0 16px 48px rgba(0,0,0,.55);
+  }
   body.theme-light{
     --bg:#fbfbf9; --panel:#f4f4f0; --text:#24262b; --dim:#7c8088;
     --accent:#3d6fa8; --line:#e0e0d9; --btn:#e9e9e3; --btn-h:#dfdfd8;
@@ -31,6 +39,73 @@
   body.theme-ink{
     --bg:#0d0e10; --panel:#16181c; --text:#c9ccd1; --dim:#6e7278;
     --accent:#7aa2e0; --line:#26292e; --btn:#1c1f24; --btn-h:#252932;
+  }
+
+  /* ============================================================
+     三套取自参考图的主题
+     ============================================================ */
+
+  /* ---- 深海：参考图 1，暗蓝 #031634 / 中蓝 #517BAB / 亮蓝 #BEE3FB ---- */
+  body.theme-ocean{
+    --bg:#031634;
+    --panel:#0A2247;
+    --text:#BEE3FB;
+    --dim:#6B93BD;
+    --accent:#517BAB;
+    --line:#16355C;
+    --btn:#0C2A52;
+    --btn-h:#133868;
+    --s1:0 1px 3px rgba(0,0,0,.45);
+    --s2:0 4px 16px rgba(0,0,0,.5);
+    --s3:0 18px 52px rgba(0,0,0,.7);
+  }
+  body.theme-ocean .chip.active,
+  body.theme-ocean button.primary{
+    background:linear-gradient(135deg,#517BAB,#3B6199);
+    border-color:#517BAB;
+    color:#F0F8FF;
+  }
+
+  /* ---- 暖纸：参考图 2，深褐 #55382D / 米白 #F4E9E0 / 象牙 #FCF5EF ---- */
+  body.theme-warmpaper{
+    --bg:#FCF5EF;
+    --panel:#F4E9E0;
+    --text:#55382D;
+    --dim:#9C7E6E;
+    --accent:#A8755C;
+    --line:#E5D3C6;
+    --btn:#F0E2D6;
+    --btn-h:#E8D5C6;
+    --s1:0 1px 2px rgba(85,56,45,.07);
+    --s2:0 4px 14px rgba(85,56,45,.1);
+    --s3:0 18px 52px rgba(85,56,45,.18);
+  }
+  body.theme-warmpaper .chip.active,
+  body.theme-warmpaper button.primary{
+    background:linear-gradient(135deg,#A8755C,#8F5E47);
+    border-color:#A8755C;
+    color:#FCF5EF;
+  }
+
+  /* ---- 墨竹：参考图 3，墨绿 #0B1F1B / 竹青 #1D4138 / 浅绿 #CEE4D2 ---- */
+  body.theme-bamboo{
+    --bg:#0B1F1B;
+    --panel:#122E28;
+    --text:#CEE4D2;
+    --dim:#6E9184;
+    --accent:#3E7A64;
+    --line:#1D4138;
+    --btn:#14332C;
+    --btn-h:#1B4239;
+    --s1:0 1px 3px rgba(0,0,0,.42);
+    --s2:0 4px 16px rgba(0,0,0,.48);
+    --s3:0 18px 52px rgba(0,0,0,.66);
+  }
+  body.theme-bamboo .chip.active,
+  body.theme-bamboo button.primary{
+    background:linear-gradient(135deg,#3E7A64,#2E6152);
+    border-color:#3E7A64;
+    color:#E8F5EA;
   }
 
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -155,10 +230,11 @@
     opacity:1;
   }
 
-  /* 亮色/护眼主题下描边反向 */
+  /* 亮色系主题的标题阴影要更淡 */
   body.theme-light header .title,
-  body.theme-sepia header .title{
-    filter:drop-shadow(0 1px 1px rgba(0,0,0,.1));
+  body.theme-sepia header .title,
+  body.theme-warmpaper header .title{
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.06));
   }
   header .spacer{flex:1;}
   button{
@@ -356,6 +432,106 @@
   }
   .hint{color:var(--dim); font-size:11.5px;}
 
+  /* ===== 翻页卡片（书页效果） ===== */
+  .book-wrap{margin-bottom:14px;}
+
+  .book-stage{
+    position:relative; min-height:150px;
+    perspective:1000px;
+    display:flex; align-items:center; justify-content:center;
+    touch-action:pan-y;
+  }
+
+  .book-page{
+    width:100%; min-height:150px;
+    background:var(--bg); border:1px solid var(--line);
+    border-radius:var(--r3); padding:30px 24px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transform-origin:center center;
+    backface-visibility:hidden;
+    transition:border-color var(--dur) var(--ease),
+               box-shadow var(--dur) var(--ease);
+    box-shadow:var(--s1);
+  }
+  .book-page:hover{
+    border-color:var(--accent);
+    box-shadow:var(--s2);
+  }
+  .book-page.flash{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(91,141,214,.25), var(--s2);
+  }
+
+  /* 翻出：向左翻 */
+  .book-page.turn-out-left{
+    animation:turnOutLeft .2s ease-in forwards;
+  }
+  @keyframes turnOutLeft{
+    from{ transform:rotateY(0) scale(1); opacity:1; }
+    to{ transform:rotateY(-75deg) scale(.96); opacity:0; }
+  }
+  /* 翻出：向右翻 */
+  .book-page.turn-out-right{
+    animation:turnOutRight .2s ease-in forwards;
+  }
+  @keyframes turnOutRight{
+    from{ transform:rotateY(0) scale(1); opacity:1; }
+    to{ transform:rotateY(75deg) scale(.96); opacity:0; }
+  }
+  /* 翻入：从右侧出现 */
+  .book-page.turn-in-right{
+    animation:turnInRight .26s ease-out forwards;
+  }
+  @keyframes turnInRight{
+    from{ transform:rotateY(75deg) scale(.96); opacity:0; }
+    to{ transform:rotateY(0) scale(1); opacity:1; }
+  }
+  /* 翻入：从左侧出现 */
+  .book-page.turn-in-left{
+    animation:turnInLeft .26s ease-out forwards;
+  }
+  @keyframes turnInLeft{
+    from{ transform:rotateY(-75deg) scale(.96); opacity:0; }
+    to{ transform:rotateY(0) scale(1); opacity:1; }
+  }
+
+  /* 页码指示 */
+  .page-indicator{
+    text-align:center; margin-top:10px;
+    font-size:11.5px; color:var(--dim);
+    font-variant-numeric:tabular-nums;
+    letter-spacing:.06em;
+    user-select:none;
+  }
+
+  /* 翻页按钮组 */
+  .pager{
+    display:flex; align-items:center; justify-content:center;
+    gap:12px; margin-bottom:4px;
+  }
+  .pager-btn{
+    padding:8px 18px; font-size:14px;
+    border-radius:var(--r-pill);
+  }
+
+  /* ===== 句子管理列表 ===== */
+  .sent-row{
+    display:flex; align-items:center; gap:10px;
+    border-left-color:var(--line);
+  }
+  .sent-row-text{
+    flex:1; font-size:12.5px; line-height:1.7;
+    font-family:inherit; word-break:break-word;
+  }
+
+  /* 减少动效偏好 */
+  @media (prefers-reduced-motion: reduce){
+    .book-page{ animation:none !important; }
+    .book-page.turn-out-left,
+    .book-page.turn-out-right{ display:none; }
+  }
+
   /* ===== 设置面板 ===== */
   #setMask{
     position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; z-index:60;
@@ -472,6 +648,9 @@
           <div class="chip" data-theme="light">亮色</div>
           <div class="chip" data-theme="sepia">护眼</div>
           <div class="chip" data-theme="ink">墨色</div>
+          <div class="chip" data-theme="ocean">深海</div>
+          <div class="chip" data-theme="warmpaper">暖纸</div>
+          <div class="chip" data-theme="bamboo">墨竹</div>
         </div>
       </div>
       <div class="set-group">

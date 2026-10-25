@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>写作器</title>
+<title>闲赋</title>
 <style>
   :root{
     --bg:#1e1f22; --panel:#26282c; --text:#d6d8dc; --dim:#8b8f96;
@@ -40,7 +40,63 @@
     font-family:"Microsoft YaHei","PingFang SC",sans-serif;
     display:flex; flex-direction:column; overflow:hidden;
     transition:background var(--dur) var(--ease), color var(--dur) var(--ease);
+    position:relative;
   }
+
+  /* ===== 纹理层（铺满全屏，位于编辑器下方） ===== */
+  #texture{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    opacity:var(--tex-opacity, 0.08);
+    transition:opacity .3s var(--ease);
+    mix-blend-mode:var(--tex-blend, normal);
+  }
+
+  /* 纹理 1：细纸纹 */
+  body[data-tex="paper"] #texture{
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0 2px, rgba(128,128,128,.06) 2px 3px),
+      repeating-linear-gradient(90deg, transparent 0 3px, rgba(128,128,128,.04) 3px 4px);
+  }
+  /* 纹理 2：布纹 */
+  body[data-tex="cloth"] #texture{
+    background-image:
+      repeating-linear-gradient(45deg, rgba(128,128,128,.08) 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(-45deg, rgba(128,128,128,.08) 0 1px, transparent 1px 5px);
+  }
+  /* 纹理 3：网格 */
+  body[data-tex="grid"] #texture{
+    background-image:
+      linear-gradient(rgba(128,128,128,.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(128,128,128,.14) 1px, transparent 1px);
+    background-size:26px 26px;
+  }
+  /* 纹理 4：横线稿纸 */
+  body[data-tex="line"] #texture{
+    background-image:repeating-linear-gradient(
+      to bottom,
+      transparent 0 31px,
+      rgba(128,128,128,.22) 31px 32px
+    );
+  }
+  /* 纹理 5：细点 */
+  body[data-tex="dot"] #texture{
+    background-image:radial-gradient(rgba(128,128,128,.35) 1px, transparent 1px);
+    background-size:14px 14px;
+  }
+  /* 纹理 6：斜纹 */
+  body[data-tex="diag"] #texture{
+    background-image:repeating-linear-gradient(
+      -45deg,
+      rgba(128,128,128,.07) 0 2px,
+      transparent 2px 8px
+    );
+  }
+  /* 无纹理 */
+  body[data-tex="none"] #texture{ display:none; }
+
+  /* 内容层需要盖在纹理上方 */
+  header, #editor, footer, #drawerMask, #drawer,
+  #panelMask, #setMask{ position:relative; z-index:1; }
 
   /* ===== 顶栏 ===== */
   header{
@@ -249,7 +305,7 @@
 <body class="theme-dark">
 
 <header>
-  <span class="title">写作器</span>
+  <span class="title">闲赋</span>
   <span class="spacer"></span>
   <button id="btnUndo" title="撤销">↶</button>
   <button id="btnRedo" title="重做">↷</button>
@@ -277,6 +333,9 @@
   <span class="spacer"></span>
   <span id="status"></span>
 </footer>
+
+<!-- 背景纹理层 -->
+<div id="texture" aria-hidden="true"></div>
 
 <!-- 抽屉 -->
 <div id="drawerMask"></div>
@@ -328,6 +387,22 @@
       <div class="set-group">
         <div class="set-label">正文宽度 <span class="val" id="valWidth">760px</span></div>
         <input type="range" class="set-slider" id="rngWidth" min="480" max="1100" step="20" value="760">
+      </div>
+      <div class="set-group">
+        <div class="set-label">背景纹理</div>
+        <div class="row" id="texRow">
+          <div class="chip" data-tex-opt="none">无</div>
+          <div class="chip" data-tex-opt="paper">纸纹</div>
+          <div class="chip" data-tex-opt="cloth">布纹</div>
+          <div class="chip" data-tex-opt="grid">网格</div>
+          <div class="chip" data-tex-opt="line">稿纸</div>
+          <div class="chip" data-tex-opt="dot">细点</div>
+          <div class="chip" data-tex-opt="diag">斜纹</div>
+        </div>
+      </div>
+      <div class="set-group">
+        <div class="set-label">纹理浓度 <span class="val" id="valTex">8%</span></div>
+        <input type="range" class="set-slider" id="rngTex" min="0" max="40" step="1" value="8">
       </div>
     </div>
   </div>

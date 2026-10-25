@@ -1,6 +1,6 @@
 {
-  "appId": "com.local.xiezuoqi",
-  "appName": "写作器",
+  "appId": "com.test.xiezuoqi2",
+  "appName": "写作器2",
   "webDir": "www",
   "bundledWebRuntime": false,
   "server": {
@@ -8,8 +8,8 @@
   },
   "android": {
     "allowMixedContent": false,
-    "captureInput": true,
-    "webContentsDebuggingEnabled": false
+    "captureInput": false,
+    "webContentsDebuggingEnabled": true
   },
   "plugins": {
     "SplashScreen": {

@@ -532,6 +532,40 @@
     .book-page.turn-out-right{ display:none; }
   }
 
+  /* ===== 轻提示 Toast ===== */
+  #appToast{
+    position:fixed;
+    left:50%; bottom:80px;
+    transform:translate(-50%, 12px);
+    padding:11px 22px;
+    background:rgba(30,31,34,.94);
+    color:#e8eaed;
+    font-size:13px;
+    border-radius:var(--r-pill);
+    box-shadow:0 6px 24px rgba(0,0,0,.45);
+    border:1px solid rgba(255,255,255,.08);
+    opacity:0;
+    pointer-events:none;
+    z-index:999;
+    transition:opacity .22s var(--ease), transform .22s var(--ease);
+    white-space:nowrap;
+    max-width:86vw;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  #appToast.show{
+    opacity:1;
+    transform:translate(-50%, 0);
+  }
+  body.theme-light #appToast,
+  body.theme-sepia #appToast,
+  body.theme-warmpaper #appToast{
+    background:rgba(253,250,245,.97);
+    color:#43382a;
+    border-color:rgba(0,0,0,.08);
+    box-shadow:0 6px 24px rgba(80,60,30,.2);
+  }
+
   /* ===== 设置面板 ===== */
   #setMask{
     position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; z-index:60;

@@ -10,7 +10,7 @@ import { defaultKeymap, history, historyKeymap, undo as undoCommand, redo as red
 import {
   loadBooks, loadChapters, createBook, addChapter, saveChapter,
   deleteChapter, deleteBook, updateBookWordCount,
-  storePut, BOOK_KEY, CHAPTER_KEY
+  storePut, countChars, BOOK_KEY, CHAPTER_KEY
 } from "./db.js";
 
 import { SENTENCE_LIB, GENRE_LIST, GENRE_NAME } from "./data.js";
@@ -63,15 +63,13 @@ function setStatus(msg, kind) {
 }
 
 function countStats(text) {
-  // 中文字符
+  // 字数统一走 db.js 的 countChars，保证书籍/章节/状态栏口径一致
+  const chars = countChars(text);
   const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-  // 英文单词（连续字母数字算一个）
   const words = (text.match(/[A-Za-z0-9]+/g) || []).length;
-  // 中文标点：全角符号区 + 中文引号 + 省略号破折号
   const punct = (text.match(/[\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026\u2014]/g) || []).length;
-  // 段落数
   const paras = text.split(/\n/).filter((l) => l.trim().length > 0).length;
-  return { chars: cjk + words + punct, cjk, words, punct, paras };
+  return { chars, cjk, words, punct, paras };
 }
 
 /* ============================================================
@@ -346,6 +344,28 @@ function renderDrawer() {
       return;
     }
 
+    // 渲染前先重算当前书字数（含标点），避免显示过期数据
+    const needRecalc = S.bookId && books.some((b) => b.id === S.bookId);
+    if (needRecalc) {
+      updateBookWordCount(S.bookId)
+        .then(() => loadBooks())
+        .then((fresh) => {
+          S.books = fresh;
+          doRenderDrawer(fresh);
+        })
+        .catch(() => doRenderDrawer(books));
+      return;
+    }
+
+    doRenderDrawer(books);
+  });
+}
+
+function doRenderDrawer(books) {
+  const body = $("drawerBody");
+  if (!body) return;
+
+  {
     let html = "";
     for (const bk of books) {
       const isActive = bk.id === S.bookId;

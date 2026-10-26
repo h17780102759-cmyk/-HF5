@@ -170,8 +170,7 @@
   body[data-tex="none"] #texture{ display:none; }
 
   /* 内容层需要盖在纹理上方 */
-  header, #editor, footer, #drawerMask, #drawer,
-  #panelMask, #setMask{ position:relative; z-index:1; }
+  
 
   /* ===== 顶栏 ===== */
   /* ===== 顶部悬浮工具栏 ===== */
@@ -206,6 +205,7 @@
   #editor{
     position:fixed;
     inset:0;
+    z-index:1;
     padding-top:calc(48px + env(safe-area-inset-top, 0px) + 12px) !important;
     padding-bottom:34px !important;
     overflow:hidden;
@@ -321,7 +321,7 @@
 
   /* ===== 抽屉 ===== */
   #drawerMask{
-    position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; z-index:40;
+    position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; z-index:200;
     backdrop-filter:blur(2px);
   }
   #drawerMask.show{display:block;}
@@ -329,7 +329,7 @@
     position:fixed; top:0; left:0; bottom:0; width:min(300px,82vw);
     background:var(--panel); border-right:1px solid var(--line);
     border-radius:0 var(--r3) var(--r3) 0;
-    box-shadow:var(--s3); z-index:41; display:flex; flex-direction:column;
+    box-shadow:var(--s3); z-index:201; display:flex; flex-direction:column;
     transform:translateX(-102%); transition:transform .22s var(--ease);
     padding-top:env(safe-area-inset-top,0px);
   }
@@ -416,7 +416,7 @@
 
   /* ===== 通用面板 ===== */
   #panelMask{
-    position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; z-index:50;
+    position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; z-index:300;
     padding:5vh 4vw; backdrop-filter:blur(3px);
   }
   #panelMask.show{display:flex; align-items:center; justify-content:center;}
@@ -634,7 +634,7 @@
 
   /* ===== 设置面板 ===== */
   #setMask{
-    position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; z-index:60;
+    position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; z-index:400;
     padding:5vh 4vw; backdrop-filter:blur(3px);
   }
   #setMask.show{display:flex; align-items:center; justify-content:center;}

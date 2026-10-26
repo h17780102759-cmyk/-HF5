@@ -63,13 +63,18 @@ function setStatus(msg, kind) {
 }
 
 function countStats(text) {
-  // 字数统一走 db.js 的 countChars，保证书籍/章节/状态栏口径一致
+  // 总字数统一走 db.js 的 countChars（对齐 Word 口径）
   const chars = countChars(text);
   const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-  const words = (text.match(/[A-Za-z0-9]+/g) || []).length;
+  const digits = (text.match(/[0-9]/g) || []).length;
+  const wordMatches = text.match(/[A-Za-z]+/g) || [];
+  let words = 0;
+  for (const w of wordMatches) {
+    words += w.length < 3 ? w.length : 1;
+  }
   const punct = (text.match(/[\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026\u2014]/g) || []).length;
   const paras = text.split(/\n/).filter((l) => l.trim().length > 0).length;
-  return { chars, cjk, words, punct, paras };
+  return { chars, cjk, digits, words, punct, paras };
 }
 
 /* ============================================================

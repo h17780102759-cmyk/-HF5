@@ -365,8 +365,7 @@ function doRenderDrawer(books) {
   const body = $("drawerBody");
   if (!body) return;
 
-  {
-    let html = "";
+  let html = "";
     for (const bk of books) {
       const isActive = bk.id === S.bookId;
       const wc = bk.wordCount || 0;
@@ -480,8 +479,7 @@ function doRenderDrawer(books) {
           });
         });
       });
-    }
-  });
+  }
 }
 
 /* ============================================================

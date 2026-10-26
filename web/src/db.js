@@ -187,10 +187,24 @@ export function deleteBook(bookId) {
    ============================================================ */
 export function countChars(text) {
   const s = text || "";
+
+  // 中文字符：每字 1
   const cjk = (s.match(/[\u4e00-\u9fff]/g) || []).length;
-  const words = (s.match(/[A-Za-z0-9]+/g) || []).length;
+
+  // 数字：每个数字字符单独计 1（Word 规则，2024 算 4 字）
+  const digits = (s.match(/[0-9]/g) || []).length;
+
+  // 英文单词：Word 规则，少于 3 字母按字符算，否则算 1 个词
+  const wordMatches = s.match(/[A-Za-z]+/g) || [];
+  let words = 0;
+  for (const w of wordMatches) {
+    words += w.length < 3 ? w.length : 1;
+  }
+
+  // 中文标点
   const punct = (s.match(/[\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026\u2014]/g) || []).length;
-  return cjk + words + punct;
+
+  return cjk + digits + words + punct;
 }
 
 export function updateBookWordCount(bookId) {

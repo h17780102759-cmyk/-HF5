@@ -5,12 +5,12 @@
 
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, drawSelection } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, undo as undoCommand, redo as redoCommand } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, undo as undoCommand, redo as redoCommand, undoDepth, redoDepth } from "@codemirror/commands";
 
 import {
   loadBooks, loadChapters, createBook, addChapter, saveChapter,
   deleteChapter, deleteBook, updateBookWordCount,
-  BOOK_KEY, CHAPTER_KEY
+  storePut, BOOK_KEY, CHAPTER_KEY
 } from "./db.js";
 
 import { SENTENCE_LIB, GENRE_LIST, GENRE_NAME } from "./data.js";
@@ -63,10 +63,15 @@ function setStatus(msg, kind) {
 }
 
 function countStats(text) {
+  // 中文字符
   const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  // 英文单词（连续字母数字算一个）
   const words = (text.match(/[A-Za-z0-9]+/g) || []).length;
+  // 中文标点：全角符号区 + 中文引号 + 省略号破折号
+  const punct = (text.match(/[\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026\u2014]/g) || []).length;
+  // 段落数
   const paras = text.split(/\n/).filter((l) => l.trim().length > 0).length;
-  return { chars: cjk + words, paras };
+  return { chars: cjk + words + punct, cjk, words, punct, paras };
 }
 
 /* ============================================================
@@ -104,7 +109,16 @@ function createEditor(parent) {
     state: EditorState.create({
       doc: "",
       extensions: [
-        history(),
+        // 撤销分组：连续输入合并为一步，停顿超过 1 秒断组
+        history({
+          newGroupDelay: 1000,
+          minDepth: 200,
+          eventFilter: (event) => {
+            // 输入法组字期间的事件不单独分组，交给 composition 处理
+            if (event.type === "compositionstart") return false;
+            return true;
+          }
+        }),
         drawSelection(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
@@ -113,22 +127,62 @@ function createEditor(parent) {
           if (u.docChanged) {
             refreshStats();
             scheduleSave();
+            updateHistoryButtons();
           }
         })
       ]
     }),
     parent
   });
+
+  // 初始化按钮状态
+  setTimeout(updateHistoryButtons, 0);
+
+  // 滚动时给悬浮栏加深阴影
+  const scroller = view.scrollDOM;
+  if (scroller) {
+    scroller.addEventListener("scroll", () => {
+      if (scroller.scrollTop > 8) {
+        document.body.classList.add("scrolled");
+      } else {
+        document.body.classList.remove("scrolled");
+      }
+    }, { passive: true });
+  }
 }
 
 function undo() {
   if (!view) return;
   undoCommand({ state: view.state, dispatch: view.dispatch });
+  updateHistoryButtons();
 }
 
 function redo() {
   if (!view) return;
   redoCommand({ state: view.state, dispatch: view.dispatch });
+  updateHistoryButtons();
+}
+
+/* ============================================================
+   撤销/重做按钮状态
+   ============================================================ */
+function updateHistoryButtons() {
+  if (!view) return;
+  const st = view.state;
+  const canUndo = undoDepth(st) > 0;
+  const canRedo = redoDepth(st) > 0;
+  const bu = $("btnUndo");
+  const br = $("btnRedo");
+  if (bu) {
+    bu.disabled = !canUndo;
+    bu.style.opacity = canUndo ? "1" : "0.35";
+    bu.style.cursor = canUndo ? "pointer" : "default";
+  }
+  if (br) {
+    br.disabled = !canRedo;
+    br.style.opacity = canRedo ? "1" : "0.35";
+    br.style.cursor = canRedo ? "pointer" : "default";
+  }
 }
 
 /* ============================================================
@@ -203,6 +257,77 @@ function switchBook(bookId) {
 }
 
 /* ============================================================
+   行内重命名：把文字变成输入框，回车确认，Esc 取消
+   ============================================================ */
+function startInlineEdit(rowEl, textSel, kind, id) {
+  if (!rowEl) return;
+  const span = rowEl.querySelector(textSel);
+  if (!span) return;
+  if (span.dataset.editing === "1") return;
+
+  const oldText = span.textContent;
+  span.dataset.editing = "1";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = oldText;
+  input.className = "inline-edit";
+  input.maxLength = 60;
+
+  span.textContent = "";
+  span.appendChild(input);
+  input.focus();
+  input.select();
+
+  let finished = false;
+
+  function finish(save) {
+    if (finished) return;
+    finished = true;
+
+    const newText = input.value.trim();
+    if (save && newText && newText !== oldText) {
+      if (kind === "book") {
+        // 更新书名
+        const bk = S.books.find((b) => b.id === id);
+        if (bk) {
+          bk.name = newText;
+          storePut("books", bk).then(() => {
+            renderDrawer();
+            setStatus("书名已改", "ok");
+          });
+          return;
+        }
+      } else if (kind === "chapter") {
+        // 更新章节名
+        const ch = S.chapters.find((c) => c.id === id);
+        if (ch) {
+          ch.title = newText;
+          saveChapter({ ...ch, updated: Date.now() }).then(() => {
+            if (S.chapterId === id) S.chapterTitle = newText;
+            renderDrawer();
+            setStatus("章节名已改", "ok");
+          });
+          return;
+        }
+      }
+    }
+
+    // 取消或不改：还原
+    span.textContent = oldText;
+    delete span.dataset.editing;
+  }
+
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener("blur", () => finish(true));
+  input.addEventListener("click", (e) => e.stopPropagation());
+}
+
+/* ============================================================
    抽屉渲染
    ============================================================ */
 function renderDrawer() {
@@ -228,6 +353,7 @@ function renderDrawer() {
       html += `<div class="bk-item${isActive ? " active" : ""}" data-book="${esc(bk.id)}">
         <span class="bk-name">${esc(bk.name)}</span>
         <span class="bk-meta">${wc}字</span>
+        <button class="edit-btn" data-editbook="${esc(bk.id)}" title="重命名">✎</button>
         <button class="del" data-delbook="${esc(bk.id)}">×</button>
       </div>`;
 
@@ -238,10 +364,11 @@ function renderDrawer() {
         } else {
           for (const ch of S.chapters) {
             const on = ch.id === S.chapterId;
-            const cc = ((ch.text || "").match(/[\u4e00-\u9fff]/g) || []).length;
+            const cc = countStats(ch.text || "").chars;
             html += `<div class="ch-item${on ? " active" : ""}" data-chapter="${esc(ch.id)}">
               <span class="ch-title">${esc(ch.title)}</span>
               <span class="ch-meta">${cc}</span>
+              <button class="edit-btn" data-editch="${esc(ch.id)}" title="重命名">✎</button>
               <button class="del" data-delch="${esc(ch.id)}">×</button>
             </div>`;
           }
@@ -255,7 +382,16 @@ function renderDrawer() {
     body.querySelectorAll("[data-book]").forEach((el) => {
       el.addEventListener("click", (e) => {
         if (e.target.classList.contains("del")) return;
+        if (e.target.classList.contains("edit-btn")) return;
         switchBook(el.dataset.book);
+      });
+    });
+
+    // 书重命名
+    body.querySelectorAll("[data-editbook]").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        startInlineEdit(el.closest(".bk-item"), ".bk-name", "book", el.dataset.editbook);
       });
     });
 
@@ -273,12 +409,21 @@ function renderDrawer() {
     body.querySelectorAll("[data-chapter]").forEach((el) => {
       el.addEventListener("click", (e) => {
         if (e.target.classList.contains("del")) return;
+        if (e.target.classList.contains("edit-btn")) return;
         saveCurrent();
         loadChapters(S.bookId).then((list) => {
           S.chapters = list;
           const idx = list.findIndex((c) => c.id === el.dataset.chapter);
           if (idx >= 0) openChapter(list, idx);
         });
+      });
+    });
+
+    // 章节重命名
+    body.querySelectorAll("[data-editch]").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        startInlineEdit(el.closest(".ch-item"), ".ch-title", "chapter", el.dataset.editch);
       });
     });
 
@@ -919,6 +1064,73 @@ function applyEnv() {
   });
 }
 
+/* ============================================================
+   双指缩放：只缩放正文字号，工具栏保持不动
+   ============================================================ */
+const ZOOM_MIN = 12;
+const ZOOM_MAX = 40;
+
+let pinchStartDist = 0;
+let pinchStartSize = 17;
+let pinching = false;
+
+function setupPinchZoom(editorEl) {
+  const pane = editorEl;
+  if (!pane) return;
+
+  function getDist(t1, t2) {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  pane.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 2) return;
+    pinching = true;
+    pinchStartDist = getDist(e.touches[0], e.touches[1]);
+    pinchStartSize = S.env.size;
+  }, { passive: true });
+
+  pane.addEventListener("touchmove", (e) => {
+    if (!pinching || e.touches.length !== 2) return;
+    e.preventDefault();
+
+    const dist = getDist(e.touches[0], e.touches[1]);
+    if (pinchStartDist < 10) return;
+
+    const ratio = dist / pinchStartDist;
+    let next = Math.round(pinchStartSize * ratio);
+    if (next < ZOOM_MIN) next = ZOOM_MIN;
+    if (next > ZOOM_MAX) next = ZOOM_MAX;
+
+    if (next !== S.env.size) {
+      S.env.size = next;
+      // 只更新字号变量，不触发完整 applyEnv
+      document.documentElement.style.setProperty("--ed-size", next + "px");
+      const vs = $("valSize"), rs = $("rngSize");
+      if (vs) vs.textContent = next + "px";
+      if (rs) rs.value = next;
+    }
+  }, { passive: false });
+
+  pane.addEventListener("touchend", (e) => {
+    if (e.touches.length < 2 && pinching) {
+      pinching = false;
+      saveEnv();
+      if (S.env.size !== pinchStartSize) {
+        showToast("字号 " + S.env.size + "px");
+      }
+    }
+  }, { passive: true });
+
+  pane.addEventListener("touchcancel", () => {
+    if (pinching) {
+      pinching = false;
+      saveEnv();
+    }
+  }, { passive: true });
+}
+
 function saveEnv() {
   try { localStorage.setItem(ENV_KEY, JSON.stringify(S.env)); } catch (e) {}
 }
@@ -941,6 +1153,9 @@ function init() {
   applyEnv();
 
   createEditor($("editor"));
+
+  // 双指缩放（只缩放正文字号，工具栏不动）
+  setupPinchZoom($("editor"));
 
   // 顶栏按钮
   $("btnUndo").addEventListener("click", undo);

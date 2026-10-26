@@ -181,13 +181,24 @@ export function deleteBook(bookId) {
     .then(() => storeDelete(BOOK_STORE, bookId));
 }
 
+/* ============================================================
+   字数统计（与 main.js 的 countStats 保持一致）
+   中文 + 英文单词 + 中文标点
+   ============================================================ */
+export function countChars(text) {
+  const s = text || "";
+  const cjk = (s.match(/[\u4e00-\u9fff]/g) || []).length;
+  const words = (s.match(/[A-Za-z0-9]+/g) || []).length;
+  const punct = (s.match(/[\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026\u2014]/g) || []).length;
+  return cjk + words + punct;
+}
+
 export function updateBookWordCount(bookId) {
   return storeGetAll(CHAP_STORE).then((all) => {
     let total = 0;
     all.forEach((c) => {
       if (c.bookId !== bookId) return;
-      const t = c.text || "";
-      total += (t.match(/[\u4e00-\u9fff]/g) || []).length;
+      total += countChars(c.text);
     });
     return storeGetAll(BOOK_STORE).then((books) => {
       const book = books.find((b) => b.id === bookId);
